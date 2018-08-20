@@ -1,7 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-
 #include <algorithm>
 
 #include <QMainWindow>
@@ -19,27 +18,34 @@
 #include <opencv2/opencv.hpp>
 
 #include "velocalib.h"
-
+#include "coordinateconvertion.h"
+#include "colormap.h"
+#include "coordinatetransform.h"
 
 class Position {
 public:
     double x;
     double y;
+    double z;
     double heading;
+    double pitch;
+    double roll;
+    Position() {}
+    Position(double x, double y, double z, double heading, double pitch, double roll)
+        : x(x), y(y), z(z), heading(heading), pitch(pitch), roll(roll) {}
 };
 
-#define SCALE 10
-#define GRID 60
-#define VELOSCALE 2
-#define VELOGRID (SCALE * GRID / VELOSCALE)
-#define RATIO (SCALE / VELOSCALE)
+#define PIXELSIZE 0.5
+#define GRID 81
+#define VELOPIXELSIZE 0.1
+#define VELOGRID (PIXELSIZE * GRID / VELOPIXELSIZE)
+#define RATIO (PIXELSIZE / VELOPIXELSIZE)
 
 namespace Ui {
 class MainWindow;
 }
 
-class MainWindow : public QMainWindow
-{
+class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
@@ -50,26 +56,31 @@ private:
     Ui::MainWindow *ui;
     void openFile();
     void exportFile();
+    void loadFile();
     void scan();
     void setTime();
     void execute();
     cv::Mat img;
+    cv::Mat imgBackground;
     cv::Mat originMap;
     cv::Mat maskMap;
 
     cv::Mat veloImg;
     cv::Mat veloMap;
+    cv::Mat camImg;
+    cv::Mat cam;
 
-    void drawGrid(cv::Mat mat, int m, int n, int scale, cv::Scalar color=cv::Scalar(100, 100, 100));
-    void fillGrid(cv::Mat mat, int m, int n, int scale, cv::Scalar color=cv::Scalar(0, 0, 0), bool withoutBorder = true);
-    void setGridMask(cv::Mat mat, int m, int n, int type);
-    void setGridMaskF(cv::Mat mat, int m, int n, int type);
+    void fillGrid(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color = cv::Scalar(0, 0, 0), bool withoutBorder = true);
+    void setGridMask(cv::Mat mat, int m, int n, int value);
+    void setGridMaskF(cv::Mat mat, int m, int n, float value);
+    void setGridMaskF_gt(cv::Mat mat, int m, int n, int value);
     QVector<QPoint> calculateLine(QPoint p1, QPoint p2);
     QVector<QPoint> calculateInner(QVector<QPoint> polygon);
     void updateImage();
     QSettings *setting;
 
-    void rotate(cv::Point3d &point, double ang);
+    CoordinateConvertion coord;
+    void rotate(cv::Point3d &p, double heading, double pitch = 0, double roll = 0);
 
     QMap<int, cv::Scalar> colorTable;
     int currentType;
@@ -77,20 +88,29 @@ private:
     QVector<QPoint> pointStack;
 
     int startTime, endTime;
-    QString velodyneFilename, gpsFilename;
+    QString velodyneFilename, gpsFilename, imuFilename;
+    QString ladybugFilename, ladybugTimeFilename;
+
+    cv::VideoCapture video;
 
     QTimer renderTimer;
     QVector<int> gpsTimeList;
     QVector<Position> posList;
     QVector<int> veloTimeList;
     QVector<int64> veloPosList;
-
+    QVector<int> cameraTimeList;
+    QVector<int> imageFrameList;
     VeloCalib innerCalib;
     QString calibFilename;
+    void drawCalibVelodyneOnImage(QVector<cv::Point3d> laser, QVector<cv::Scalar> color, cv::Mat& image);
+
 protected:
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
     void keyPressEvent(QKeyEvent *event);
+
+    QVector<cv::Point3d> pointsGlobal;
+    QVector<cv::Scalar> colorsGlobal;
 };
 
 #endif // MAINWINDOW_H

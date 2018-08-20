@@ -26,13 +26,19 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    velocalib.cpp
+    velocalib.cpp \
+    coordinateconvertion.cpp \
+    colormap.cpp \
+    coordinatetransform.cpp
 
 HEADERS += \
         mainwindow.h \
-    velocalib.h
+    velocalib.h \
+    coordinateconvertion.h \
+    colormap.h \
+    coordinatetransform.h
 
 FORMS += \
         mainwindow.ui
 
-LIBS += -lopencv_core -lopencv_highgui -lopencv_imgproc
+LIBS += -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_imgcodecs -lopencv_videoio

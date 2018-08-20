@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>608</width>
+    <width>1103</width>
     <height>519</height>
    </rect>
   </property>
@@ -27,7 +27,11 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="lineEdit_gpstime"/>
+         <widget class="QLineEdit" name="lineEdit_gpstime">
+          <property name="text">
+           <string>52570889</string>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="pushButton_set">
@@ -63,6 +67,62 @@
           </property>
          </widget>
         </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_showLidar">
+          <property name="text">
+           <string>showLidar</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QDoubleSpinBox" name="doubleSpinBox_min">
+          <property name="minimum">
+           <double>-10.000000000000000</double>
+          </property>
+          <property name="singleStep">
+           <double>0.100000000000000</double>
+          </property>
+          <property name="value">
+           <double>-2.200000000000000</double>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QDoubleSpinBox" name="doubleSpinBox_max">
+          <property name="decimals">
+           <number>2</number>
+          </property>
+          <property name="minimum">
+           <double>-10.000000000000000</double>
+          </property>
+          <property name="singleStep">
+           <double>0.100000000000000</double>
+          </property>
+          <property name="value">
+           <double>0.200000000000000</double>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QDoubleSpinBox" name="doubleSpinBox_rotz">
+          <property name="decimals">
+           <number>3</number>
+          </property>
+          <property name="singleStep">
+           <double>0.001000000000000</double>
+          </property>
+          <property name="value">
+           <double>3.455000000000000</double>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="lineEdit_param">
+          <property name="text">
+           <string>1</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </item>
       <item>
@@ -78,7 +138,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QLabel" name="labelLidar">
+         <widget class="QLabel" name="labelImage">
           <property name="text">
            <string>TextLabel</string>
           </property>
@@ -99,28 +159,35 @@
          <item>
           <widget class="QRadioButton" name="radioButton_blank">
            <property name="text">
-            <string>blank</string>
+            <string>Unknown</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QRadioButton" name="radioButton_type1">
            <property name="text">
-            <string>type1</string>
+            <string>Up</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QRadioButton" name="radioButton_type2">
            <property name="text">
-            <string>type2</string>
+            <string>Down</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QRadioButton" name="radioButton_type3">
            <property name="text">
-            <string>type3</string>
+            <string>Free</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="radioButton_type4">
+           <property name="text">
+            <string>Water</string>
            </property>
           </widget>
          </item>
@@ -179,8 +246,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>608</width>
-     <height>23</height>
+     <width>1103</width>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -189,9 +256,16 @@
     </property>
     <addaction name="actionOpen"/>
     <addaction name="actionScan"/>
+   </widget>
+   <widget class="QMenu" name="menuAction">
+    <property name="title">
+     <string>Action</string>
+    </property>
+    <addaction name="actionLoad"/>
     <addaction name="actionExport"/>
    </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuAction"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
    <attribute name="toolBarArea">
@@ -215,6 +289,11 @@
   <action name="actionScan">
    <property name="text">
     <string>Scan</string>
+   </property>
+  </action>
+  <action name="actionLoad">
+   <property name="text">
+    <string>Load</string>
    </property>
   </action>
  </widget>
