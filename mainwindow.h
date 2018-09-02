@@ -72,6 +72,7 @@ private:
     cv::Mat cam;
 
     void fillGrid(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color = cv::Scalar(0, 0, 0), bool withoutBorder = true);
+    void fillCircle(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color = cv::Scalar(0, 0, 0), bool withoutBorder = true);
     void setGridMask(cv::Mat mat, int m, int n, int value);
     void setGridMaskF(cv::Mat mat, int m, int n, float value);
     void setGridMaskF_gt(cv::Mat mat, int m, int n, int value);

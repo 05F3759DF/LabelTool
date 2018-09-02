@@ -68,6 +68,13 @@
          </widget>
         </item>
         <item>
+         <widget class="QCheckBox" name="checkBox_showClassified">
+          <property name="text">
+           <string>showClassified</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QCheckBox" name="checkBox_showLidar">
           <property name="text">
            <string>showLidar</string>

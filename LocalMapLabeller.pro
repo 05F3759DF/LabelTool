@@ -29,14 +29,19 @@ SOURCES += \
     velocalib.cpp \
     coordinateconvertion.cpp \
     colormap.cpp \
-    coordinatetransform.cpp
+    coordinatetransform.cpp \
+    pointclassifier.cpp \
+    calcplane.cpp \
+
 
 HEADERS += \
         mainwindow.h \
     velocalib.h \
     coordinateconvertion.h \
     colormap.h \
-    coordinatetransform.h
+    coordinatetransform.h \
+    pointclassifier.h \
+    calcplane.h
 
 FORMS += \
         mainwindow.ui

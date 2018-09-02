@@ -1,5 +1,5 @@
 #include "coordinatetransform.h"
-#include <cmath>
+
 void X::rMatrixInit(Matrix &rt) {
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
@@ -270,4 +270,41 @@ void X::normalPoint3d(Point3d &pt) {
     pt.x /= dist;
     pt.y /= dist;
     pt.z /= dist;
+}
+
+double X::distance(X::Point3d pt1, X::Point3d pt2) {
+    return sqrt((pt1.x - pt2.x) * (pt1.x - pt2.x) + (pt1.y - pt2.y) * (pt1.y - pt2.y) + (pt1.z - pt2.z) * (pt1.z - pt2.z));
+}
+
+double X::distance(X::Point3d pt1) {
+    return sqrt(pt1.x * pt1.x + pt1.y * pt1.y + pt1.z * pt1.z);
+}
+
+bool X::isNeighbor(X::Point3d pt, X::Point3d cp, bool ishori) {
+    double rng = std::max(distance(pt), distance(cp));
+    double maxdd = ishori ? std::max(BASEERROR, 0.03 * rng) : std::max(BASEERROR, 0.3 * rng);
+    double dd = distance(pt, cp);
+    if (dd > maxdd) {
+        return false;
+    }
+
+    bool isneighbor = false;
+    double dz = fabs(pt.z - cp.z);
+    if (dz < 0.1) {
+        isneighbor = true;
+    } else {
+        double dh = sqrt((pt.x - cp.x) * (pt.x - cp.x) + (pt.y - cp.y) * (pt.y - cp.y));
+        if (dh < 0.56) {
+            isneighbor = false;
+        } else {
+            double ang = atan2(dz, dh);
+            if (ang < 0.17) {                   // 5deg
+                isneighbor = true;
+            } else {
+                isneighbor = false;
+            }
+        }
+    }
+
+    return isneighbor;
 }

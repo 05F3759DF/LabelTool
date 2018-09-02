@@ -17,7 +17,6 @@ MainWindow::MainWindow(QWidget *parent) :
     X::rotatePoint3d(p, rotInv);
     qDebug() << p.x << p.y << p.z;
 
-
     connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::openFile);
     connect(ui->actionExport, &QAction::triggered, this, &MainWindow::exportFile);
     connect(ui->actionExport_Background, &QAction::triggered, this, &MainWindow::exportBackground);
@@ -39,10 +38,10 @@ MainWindow::MainWindow(QWidget *parent) :
         }
     }
 
-    colorTable[1] = cv::Scalar(255, 128, 0, 100);
-    colorTable[2] = cv::Scalar(255, 0, 0, 100);
-    colorTable[3] = cv::Scalar(0, 255, 0, 100);
-    colorTable[4] = cv::Scalar(0, 0, 255, 100);
+    colorTable[1] = cv::Scalar(0, 0, 255, 255);
+    colorTable[2] = cv::Scalar(102, 217, 255, 255);
+    colorTable[3] = cv::Scalar(80, 176, 0, 255);
+    colorTable[4] = cv::Scalar(240, 176, 0, 255);
     colorTable[11] = cv::Scalar(255, 255, 0, 25);
     colorTable[12] = cv::Scalar(0, 0, 255, 25);
     colorTable[13] = cv::Scalar(255, 0, 255, 25);
@@ -155,8 +154,7 @@ void MainWindow::exportBackground() {
     QMessageBox::information(this, "Info", QString("Background has been saved to %1.").arg(imgBackgroundName));
 }
 
-void MainWindow::loadFile()
-{
+void MainWindow::loadFile() {
     QString filename = QFileDialog::getOpenFileName(this, "Label", ".", "*.csv");
     if (filename.isEmpty()) {
         return;
@@ -399,6 +397,26 @@ void MainWindow::fillGrid(cv::Mat mat, int m, int n, double pixelSize, cv::Scala
                   cv::Point((n + 1) / pixelSize - 1, (m + 1) / pixelSize - 1), color, -1);
 }
 
+void MainWindow::fillCircle(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color, bool withoutBorder) {
+    if (m < 0 || n < 0 || m >= mat.rows * pixelSize || n >= mat.cols * pixelSize) {
+        return;
+    }
+
+    cv::circle(mat, cv::Point((n + 0.5) / pixelSize, (m + 0.5) / pixelSize),
+               0.75 / pixelSize, cv::Scalar(255, 255, 255), 2);
+    cv::circle(mat, cv::Point((n + 0.5) / pixelSize, (m + 0.5) / pixelSize),
+               0.75 / pixelSize, cv::Scalar(0, 0, 0), 1);
+
+    cv::circle(mat, cv::Point((n + 0.5) / pixelSize, (m + 0.5) / pixelSize),
+               0.53 / pixelSize, cv::Scalar(0, 0, 0), 2);
+
+    cv::circle(mat, cv::Point((n + 0.5) / pixelSize, (m + 0.5) / pixelSize),
+               0.5 / pixelSize, color, -1);
+
+    cv::circle(mat, cv::Point((n + 0.5) / pixelSize, (m + 0.5) / pixelSize),
+               0.2 / pixelSize, cv::Scalar(255, 255, 255), -1);
+}
+
 void MainWindow::setGridMask(cv::Mat mat, int m, int n, int value) {
     if (m < 0 || n < 0 || m >= mat.rows || n >= mat.cols) {
         return;
@@ -530,7 +548,7 @@ void MainWindow::updateImage() {
             int tag = originMap.at<uchar>(i, j);
             if (tag) {
                 num += 1;
-                fillGrid(img, i, j, VELOPIXELSIZE, colorTable[tag]);
+                fillCircle(img, i, j, VELOPIXELSIZE, colorTable[tag]);
                 for (int ti = 0; ti < RATIO; ti++) {
                     for (int tj = 0; tj < RATIO; tj++) {
                         points_tag.append(cv::Point3d((j * RATIO + tj - veloMap.cols / 2) * VELOPIXELSIZE, (veloMap.rows - i * RATIO - ti) * VELOPIXELSIZE,
@@ -551,7 +569,6 @@ void MainWindow::updateImage() {
     QImage qveloimg((const uchar*)img.data, img.cols, img.rows,
                     img.step, QImage::Format_RGB888);
     ui->labelMapImage->setPixmap(QPixmap::fromImage(qveloimg.rgbSwapped()));
-
 
     if (!camImg.empty()) {
         cam = camImg.clone();
