@@ -20,6 +20,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::openFile);
     connect(ui->actionExport, &QAction::triggered, this, &MainWindow::exportFile);
+    connect(ui->actionExport_Background, &QAction::triggered, this, &MainWindow::exportBackground);
     connect(ui->actionLoad, &QAction::triggered, this, &MainWindow::loadFile);
     connect(ui->actionScan, &QAction::triggered, this, &MainWindow::scan);
     connect(ui->pushButton_set, &QPushButton::clicked, this, &MainWindow::setTime);
@@ -144,10 +145,14 @@ void MainWindow::exportFile() {
     fclose(f);
     QString imgName = ui->lineEdit_gpstime->text() + ".png";
     cv::imwrite(imgName.toStdString(), img);
+    QMessageBox::information(this, "Info", QString("Labels have been saved to %1.").arg(filename));
+}
+
+void MainWindow::exportBackground() {
     QString imgBackgroundName = ui->lineEdit_gpstime->text() + "_background.png";
     cv::imwrite(imgBackgroundName.toStdString(), imgBackground);
 
-    QMessageBox::information(this, "Info", QString("Labels have been saved to %1.").arg(filename));
+    QMessageBox::information(this, "Info", QString("Background has been saved to %1.").arg(imgBackgroundName));
 }
 
 void MainWindow::loadFile()
@@ -356,7 +361,7 @@ void MainWindow::execute() {
                 //                point.y += deltaY;
                 //                point.z += deltaZ;
                 //                rotate(point, -currentPos.heading);
-                if (point.z > 0.5) {
+                if (point.z > 10.5) {
                     continue;
                 }
                 pointsGlobal.append(point);
@@ -612,7 +617,9 @@ void MainWindow::drawCalibVelodyneOnImage(QVector<cv::Point3d> laser, QVector<cv
         pL.x = laser[i].x * scale;
         pL.y = laser[i].y * scale;
         pL.z = laser[i].z * scale;
-        //        pL.z = -2.12;
+        if (pL.z < -100) {
+            pL.z = -2.12;
+        }
 
         X::rotatePoint3d(pL, velodyne_camera_rot);
         X::shiftPoint3d(pL, velodyne_camera_shift);

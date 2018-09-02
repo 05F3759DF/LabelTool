@@ -56,6 +56,7 @@ private:
     Ui::MainWindow *ui;
     void openFile();
     void exportFile();
+    void exportBackground();
     void loadFile();
     void scan();
     void setTime();
