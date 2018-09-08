@@ -8,10 +8,10 @@
 #include "coordinatetransform.h"
 #include "calcplane.h"
 
-#define PNTS_PER_LINE           32
-#define LINES_PER_BLK           12
-#define PTNUM_PER_BLK           (32 * 12)
-#define BKNUM_PER_FRM           180
+#define BOUND(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
+#define NINT(x)                 (int)((x > 0) ? (x + 0.5) : (x - 0.5))
+
+#define PNTS_PER_LINE 32
 
 #define HORIERRFACTOR 0.02
 #define VERTERRFACTOR 0.05
@@ -51,9 +51,9 @@ public:
 class PointClassifier {
 public:
     PointClassifier();
-    std::vector<std::vector<cv::Point3d>> pointcloud;
+    std::vector<std::vector<X::Point3d>> pointcloud;
     RMap rmap;
-    void setPointCloud(std::vector<std::vector<cv::Point3d>> points);
+    void setPointCloud(std::vector<std::vector<X::Point3d>> points);
     void initRMap();
     void smoothingData();
     void contourExtraction();

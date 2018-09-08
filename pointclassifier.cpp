@@ -2,17 +2,23 @@
 
 PointClassifier::PointClassifier() {}
 
-void PointClassifier::setPointCloud(std::vector<std::vector<cv::Point3d>> points) {
+void PointClassifier::setPointCloud(std::vector<std::vector<X::Point3d>> points) {
     pointcloud = points;
     initRMap();
 
     for (int i = 0; i < rmap.width * rmap.length; i++) {
         rmap.pts[i].x = rmap.pts[i].y = rmap.pts[i].z = 0;
-        rmap.regionID[i] = 0;
+        rmap.regionID[i] = UNKNOWN;
     }
     rmap.regnum = 0;
 
     // TODO: regist point to rmap
+    for (int k = 0; k < 32; k++) {
+        for (int i = 0; i < pointcloud[k].size(); i++) {
+            rmap.pts[k * rmap.width + i] = X::Point3d(pointcloud[k][i].x, pointcloud[k][i].y, pointcloud[k][i].z);
+        }
+    }
+
     smoothingData();
 
     contourExtraction();
@@ -23,16 +29,49 @@ void PointClassifier::setPointCloud(std::vector<std::vector<cv::Point3d>> points
         region2Seg();
     }
 
+    rmap.rMap.setTo(0);            // 距离图像
+    rmap.lMap.setTo(0);            // 分割图像
+    //按分割分类结果赋予可视化位图颜色
+    for (int y = 0; y < rmap.length; y++) {
+        for (int x = 0; x < rmap.width; x++) {
+            if (!rmap.pts[y * rmap.width + x].i) {
+                rmap.rMap.at<cv::Vec3b>(y, x) = cv::Vec3b(255, 255, 255);
+                continue;
+            }
+            if (rmap.pts[y * rmap.width + x].z < 0.0) {
+                rmap.rMap.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, BOUND(NINT(-rmap.pts[y * rmap.width + x].z * 100.0), 0, 255));
+            } else {
+                rmap.rMap.at<cv::Vec3b>(y, x) = cv::Vec3b(BOUND(NINT(-rmap.pts[y * rmap.width + x].z * 100.0), 0, 255), 0, 0);
+            }
+            if (rmap.regionID[y * rmap.width + x] == EDGEPT) {
+                rmap.lMap.at<cv::Vec3b>(y, x) = cv::Vec3b(255, 128, 128);
+            } else if (rmap.regionID[y * rmap.width + x] == NONVALID) {
+                rmap.lMap.at<cv::Vec3b>(y, x) = cv::Vec3b(255, 255, 255);
+            } else if (rmap.regionID[y * rmap.width + x] == UNKNOWN) {
+                rmap.lMap.at<cv::Vec3b>(y, x) = cv::Vec3b(64, 64, 64);
+            } else {
+                SegBuf *segbuf = &rmap.segbuf[rmap.regionID[y * rmap.width + x]];
+                if (segbuf->ptnum) {
+                    rmap.lMap.at<cv::Vec3b>(y, x) =
+                        cv::Vec3b(NINT(fabs(segbuf->norm.x) * 255.0), NINT(fabs(segbuf->norm.y) * 255.0), NINT(segbuf->norm.z * 255.0));
+                }
+            }
+        }
+    }
+    cv::resize(rmap.rMap, rmap.rMap, cv::Size(1024, 96));
+    cv::resize(rmap.lMap, rmap.lMap, cv::Size(1024, 96));
+    cv::imwrite("rmap.png", rmap.rMap);
+    cv::imwrite("lmap.png", rmap.lMap);
 }
 
 void PointClassifier::initRMap() {
-    rmap.width = LINES_PER_BLK * BKNUM_PER_FRM;
-    rmap.length = PNTS_PER_LINE;
+    rmap.width = pointcloud[0].size();
+    rmap.length = 32;
     rmap.pts = new X::Point3d[rmap.width * rmap.length];
     rmap.regionID = new int[rmap.width * rmap.length];
     rmap.segbuf = NULL;
-    rmap.rMap = cv::Mat(rmap.width, rmap.length, CV_8UC3);
-    rmap.lMap = cv::Mat(rmap.width, rmap.length, CV_8UC3);
+    rmap.rMap = cv::Mat(rmap.length, rmap.width, CV_8UC3);
+    rmap.lMap = cv::Mat(rmap.length, rmap.width, CV_8UC3);
 }
 
 void PointClassifier::smoothingData() {

@@ -24,6 +24,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionScan, &QAction::triggered, this, &MainWindow::scan);
     connect(ui->pushButton_set, &QPushButton::clicked, this, &MainWindow::setTime);
     connect(ui->pushButton_execute, &QPushButton::clicked, this, &MainWindow::execute);
+    connect(ui->pushButton_showSplitCloud, &QPushButton::clicked, this, &MainWindow::showSplitCloud);
 
     img.create(GRID / VELOPIXELSIZE + 1, GRID / VELOPIXELSIZE + 1, CV_8UC3);
     veloImg.create(GRID / VELOPIXELSIZE + 1, GRID / VELOPIXELSIZE + 1, CV_8UC3);
@@ -37,11 +38,11 @@ MainWindow::MainWindow(QWidget *parent) :
             veloMap.at<float>(i, j) = -1000;
         }
     }
-
+    initialized = false;
     colorTable[1] = cv::Scalar(0, 0, 255, 255);
     colorTable[2] = cv::Scalar(102, 217, 255, 255);
-    colorTable[3] = cv::Scalar(80, 176, 0, 255);
-    colorTable[4] = cv::Scalar(240, 176, 0, 255);
+    colorTable[3] = cv::Scalar(0, 255, 0, 255);
+    colorTable[4] = cv::Scalar(255, 0, 0, 255);
     colorTable[11] = cv::Scalar(255, 255, 0, 25);
     colorTable[12] = cv::Scalar(0, 0, 255, 25);
     colorTable[13] = cv::Scalar(255, 0, 255, 25);
@@ -144,6 +145,10 @@ void MainWindow::exportFile() {
     fclose(f);
     QString imgName = ui->lineEdit_gpstime->text() + ".png";
     cv::imwrite(imgName.toStdString(), img);
+    QString camName = ui->lineEdit_gpstime->text() + "_cam.png";
+    cv::imwrite(camName.toStdString(), cam);
+    QString camRawName = ui->lineEdit_gpstime->text() + "_cam_raw.png";
+    cv::imwrite(camRawName.toStdString(), cam_raw);
     QMessageBox::information(this, "Info", QString("Labels have been saved to %1.").arg(filename));
 }
 
@@ -277,13 +282,12 @@ void MainWindow::execute() {
     }
     int time = ui->lineEdit_gpstime->text().toInt();
     int gpsIndex = std::lower_bound(gpsTimeList.begin(), gpsTimeList.end(), time) - gpsTimeList.begin();
-    qDebug() << time << gpsTimeList[gpsIndex];
     auto currentPos = posList[gpsIndex];
     FILE *fvelodyne = fopen(velodyneFilename.toStdString().c_str(), "rb");
     char data[2048];
     int startIndex = ui->lineEdit_starttime->text().toInt();
     int endIndex = ui->lineEdit_endtime->text().toInt();
-    qDebug() << veloTimeList[startIndex] << veloTimeList[endIndex];
+    qDebug() << "velotime" << veloTimeList[startIndex] << veloTimeList[endIndex];
 
     pointsGlobal.clear();
     colorsGlobal.clear();
@@ -331,7 +335,7 @@ void MainWindow::execute() {
 
                 double xyDistance = distance * cosVertAngle;
 
-                cv::Point3d point;
+                X::Point3d point;
                 point.x = xyDistance * sinRotAngle * 0.01;
                 point.y = xyDistance * cosRotAngle * 0.01;
                 point.z = distance * sinVertAngle * 0.01; // to m
@@ -340,8 +344,8 @@ void MainWindow::execute() {
                     continue;
                 }
                 if (point.y < 3 && point.y > -1.8 && abs(point.x) < 1.5) {
-                    pointsGlobal.append(point);
-                    colorsGlobal.append(cv::Scalar(0, 0, 255));
+//                    pointsGlobal.append(cv::Point3d(point.x, point.y, point.z));
+//                    colorsGlobal.append(cv::Scalar(0, 0, 255));
                     continue;
                 }
                 X::Point3d p(point.x, point.y, point.z);
@@ -359,10 +363,10 @@ void MainWindow::execute() {
                 //                point.y += deltaY;
                 //                point.z += deltaZ;
                 //                rotate(point, -currentPos.heading);
-                if (point.z > 10.5) {
+                if (point.z > 0) {
                     continue;
                 }
-                pointsGlobal.append(point);
+                pointsGlobal.append(cv::Point3d(point.x, point.y, point.z));
                 colorsGlobal.append(cv::Scalar(255, 0, 0));
                 int r = -point.y / VELOPIXELSIZE + VELOGRID;
                 int c = point.x / VELOPIXELSIZE + VELOGRID / 2;
@@ -387,6 +391,9 @@ void MainWindow::execute() {
     }
     video.set(CV_CAP_PROP_POS_FRAMES, imageFrameList[cameraIndexForVelo]);
     video >> camImg;
+    if (!initialized) {
+        initialized = true;
+    }
 }
 
 void MainWindow::fillGrid(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color, bool withoutBorder) {
@@ -518,6 +525,9 @@ QVector<QPoint> MainWindow::calculateInner(QVector<QPoint> polygon) {
 }
 
 void MainWindow::updateImage() {
+    if (!initialized) {
+        return;
+    }
     img.setTo(255);
     QVector<cv::Point3d> points;
     QVector<cv::Scalar> colors;
@@ -536,7 +546,7 @@ void MainWindow::updateImage() {
             int g = COLORMAP_G[level];
             points.append(cv::Point3d((j - veloMap.cols / 2) * VELOPIXELSIZE, (veloMap.rows - i) * VELOPIXELSIZE, veloMap.at<float>(i, j)));
             colors.append(cv::Scalar(b, g, r));
-            fillGrid(img, i, j, PIXELSIZE, cv::Scalar(b, g, r, 0), false);
+            fillGrid(img, i, j, PIXELSIZE, cv::Scalar(255 - level, 255 - level, 255 - level, 0), false);
         }
     }
     imgBackground = img.clone();
@@ -572,6 +582,7 @@ void MainWindow::updateImage() {
 
     if (!camImg.empty()) {
         cam = camImg.clone();
+        cam_raw = camImg.clone();
         //        drawCalibVelodyneOnImage(pointsGlobal, colorsGlobal, cam);
         if (ui->checkBox_showLidar->isChecked()) {
             drawCalibVelodyneOnImage(points, colors, cam);
@@ -579,6 +590,7 @@ void MainWindow::updateImage() {
         }
         cv::Rect rect(cam.cols / 2 - 100, 0, cam.cols / 2, cam.rows);
         cam = cam(rect);
+        cam_raw = cam_raw(rect);
         cv::resize(cam, cam, cv::Size(), (double)img.cols / cam.cols, (double)img.cols / cam.cols);
         QImage qcameraimg((const uchar*)cam.data, cam.cols, cam.rows,
                           cam.step, QImage::Format_RGB888);
@@ -588,20 +600,20 @@ void MainWindow::updateImage() {
     ui->statusBar->showMessage(QString("%1 points are labelled").arg(num));
 }
 
-void MainWindow::rotate(cv::Point3d &p, double heading, double pitch, double roll) {
-    cv::Point3d p1;
+void MainWindow::rotate(X::Point3d &p, double heading, double pitch, double roll) {
+    X::Point3d p1;
     p1.x = p.x * cos(heading) + p.y * sin(heading);
     p1.y = -p.x * sin(heading) + p.y * cos(heading);
     p1.z = p.z;
     p = p1;
 
-    cv::Point3d p2;
+    X::Point3d p2;
     p2.x = p.x;
     p2.y = p.y * cos(pitch) - p.z * sin(pitch);
     p2.z = p.y * sin(pitch) + p.z * cos(pitch);
     p = p2;
 
-    cv::Point3d p3;
+    X::Point3d p3;
     p3.x = p.x;
     p3.y = p.y;
     p3.z = p.z;
@@ -655,6 +667,84 @@ void MainWindow::drawCalibVelodyneOnImage(QVector<cv::Point3d> laser, QVector<cv
         }
         cv::circle(image, cv::Point(x, y), 2, color[i], -1);
     }
+}
+
+void MainWindow::showSplitCloud() {
+    int time = ui->lineEdit_gpstime->text().toInt();
+    int gpsIndex = std::lower_bound(gpsTimeList.begin(), gpsTimeList.end(), time) - gpsTimeList.begin();
+    auto currentPos = posList[gpsIndex];
+    FILE *fvelodyne = fopen(velodyneFilename.toStdString().c_str(), "rb");
+    char data[2048];
+    int startIndex = ui->lineEdit_starttime->text().toInt();
+    int endIndex = ui->lineEdit_endtime->text().toInt();
+
+    bool circleInit = true;
+    bool circleStart = true;
+    unsigned int startAngle;
+    std::vector<std::vector<X::Point3d>> points;
+    points.resize(32);
+    for (int index = startIndex; index <= endIndex; index++) {
+        int veloTime = veloTimeList[index];
+        int gpsIndexForVelo = std::lower_bound(gpsTimeList.begin(), gpsTimeList.end(), veloTime) - gpsTimeList.begin();
+        if (gpsIndexForVelo == 0 || gpsIndexForVelo == gpsTimeList.size()) {
+            continue;
+        }
+
+        fseeko64(fvelodyne, veloPosList[index] + 42, SEEK_SET);
+        fread(data, 1, 1200, fvelodyne);
+
+        for (int i = 0; i < 12; i++) {
+            int blockStart = i * 100;
+            unsigned int blockID = (unsigned char)data[blockStart] + (unsigned char)data[blockStart + 1] * 0x100;
+            int blockOffset = blockID == 0xEEFF ? 0 : 32;
+            unsigned int rotationData = (unsigned char)data[blockStart + 2] + (unsigned char)data[blockStart + 3] * 0x100;
+//            qDebug() << "time" << veloTime << rotationData;
+            if (!circleInit && (rotationData - startAngle < 20 || rotationData - startAngle < -35980)) {
+                qDebug() << "new" << points[0].size();
+                if (points[0].size() > 800) {
+                    PointClassifier classifier;
+                    classifier.setPointCloud(points);
+                    circleStart = true;
+                    for (auto &s: points) {
+                        s.clear();
+                    }
+                    qDebug() << "------------------------------------------------";
+                }
+            }
+            circleStart = false;
+            if (circleInit) {
+                startAngle = rotationData;
+                circleInit = false;
+            }
+//            qDebug() << rotationData;
+            double theta = rotationData / 18000.0 * M_PI;
+            for (int j = 0; j < 32; j++) {
+                int index = j + blockOffset;
+                int distanceData = (unsigned char)data[blockStart + 4 + j * 3] + (unsigned char)data[blockStart + 5 + j * 3] * 0x100;
+                int intensity = (unsigned char)data[blockStart + 6 + j * 3];
+
+                double distance = distanceData * innerCalib.unit + innerCalib.distCorrection[index];
+
+                double cosVertAngle = cos(innerCalib.vertCorrection[index]);
+                double sinVertAngle = sin(innerCalib.vertCorrection[index]);
+
+                double cosRotAngle = cos(theta);
+                double sinRotAngle = sin(theta);
+
+                double xyDistance = distance * cosVertAngle;
+
+                X::Point3d point;
+                point.x = xyDistance * sinRotAngle * 0.01;
+                point.y = xyDistance * cosRotAngle * 0.01;
+                point.z = distance * sinVertAngle * 0.01; // to m
+                point.i = intensity;
+                rotate(point, M_PI_2, 0, 0);
+                point.z -= 2.12;
+                points[31 - innerCalib.idx[j]].push_back(point);
+            }
+        }
+    }
+
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
@@ -809,12 +899,6 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
         if (pointStack.size() > 0 && pointStack[0] == QPoint(m, n)) {
             setGridMask(maskMap, m, n, 13);
         }
-    }
-    if (graphType == "Camera") {
-        auto point = ui->labelImage->mapFrom(this, event->pos());
-        int margin_left = ui->labelImage->width() <= cam.rows ? 0 : (ui->labelMapImage->width() - cam.rows) / 2;
-        int margin_top = ui->labelImage->height() <= cam.cols ? 0 : (ui->labelMapImage->height() - cam.cols) / 2;
-        qDebug() << point.x() << point.y();
     }
 }
 

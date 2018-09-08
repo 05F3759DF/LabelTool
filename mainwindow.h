@@ -21,6 +21,7 @@
 #include "coordinateconvertion.h"
 #include "colormap.h"
 #include "coordinatetransform.h"
+#include "pointclassifier.h"
 
 class Position {
 public:
@@ -68,8 +69,9 @@ private:
 
     cv::Mat veloImg;
     cv::Mat veloMap;
-    cv::Mat camImg;
-    cv::Mat cam;
+    cv::Mat camImg, cam, cam_raw;
+
+    bool initialized;
 
     void fillGrid(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color = cv::Scalar(0, 0, 0), bool withoutBorder = true);
     void fillCircle(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color = cv::Scalar(0, 0, 0), bool withoutBorder = true);
@@ -82,7 +84,7 @@ private:
     QSettings *setting;
 
     CoordinateConvertion coord;
-    void rotate(cv::Point3d &p, double heading, double pitch = 0, double roll = 0);
+    void rotate(X::Point3d &p, double heading, double pitch = 0, double roll = 0);
 
     QMap<int, cv::Scalar> colorTable;
     int currentType;
@@ -106,6 +108,7 @@ private:
     QString calibFilename;
     void drawCalibVelodyneOnImage(QVector<cv::Point3d> laser, QVector<cv::Scalar> color, cv::Mat& image);
 
+    void showSplitCloud();
 protected:
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);

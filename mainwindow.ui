@@ -68,9 +68,9 @@
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="checkBox_showClassified">
+         <widget class="QPushButton" name="pushButton_showSplitCloud">
           <property name="text">
-           <string>showClassified</string>
+           <string>ShowSplitCloud</string>
           </property>
          </widget>
         </item>

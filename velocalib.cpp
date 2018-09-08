@@ -133,5 +133,10 @@ bool VeloCalib::loadCalib(std::string filename) {
     std::sort(idx.begin(), idx.begin() + linenum, [this](size_t i1, size_t i2) {
         return vertCorrection[i1] <  vertCorrection[i2];
     });
+    auto index = idx;
+    for (int i = 0; i < idx.size(); i++) {
+        index[idx[i]] = i;
+    }
+    idx = index;
     return true;
 }
