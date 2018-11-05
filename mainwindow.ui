@@ -79,6 +79,9 @@
           <property name="text">
            <string>showLidar</string>
           </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
@@ -90,7 +93,7 @@
            <double>0.100000000000000</double>
           </property>
           <property name="value">
-           <double>-2.200000000000000</double>
+           <double>-2.700000000000000</double>
           </property>
          </widget>
         </item>
@@ -293,6 +296,9 @@
    <property name="text">
     <string>Export</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
   </action>
   <action name="actionScan">
    <property name="text">
@@ -307,6 +313,9 @@
   <action name="actionExport_Background">
    <property name="text">
     <string>Export Background</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+B</string>
    </property>
   </action>
  </widget>

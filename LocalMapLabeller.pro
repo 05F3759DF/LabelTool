@@ -28,10 +28,7 @@ SOURCES += \
         mainwindow.cpp \
     velocalib.cpp \
     coordinateconvertion.cpp \
-    colormap.cpp \
     coordinatetransform.cpp \
-    pointclassifier.cpp \
-    calcplane.cpp \
 
 
 HEADERS += \
@@ -39,9 +36,7 @@ HEADERS += \
     velocalib.h \
     coordinateconvertion.h \
     colormap.h \
-    coordinatetransform.h \
-    pointclassifier.h \
-    calcplane.h
+    coordinatetransform.h
 
 FORMS += \
         mainwindow.ui

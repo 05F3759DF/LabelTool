@@ -21,8 +21,10 @@
 #include "coordinateconvertion.h"
 #include "colormap.h"
 #include "coordinatetransform.h"
-#include "pointclassifier.h"
 
+/**
+ * @brief 记录位置信息
+ */
 class Position {
 public:
     double x;
@@ -31,7 +33,8 @@ public:
     double heading;
     double pitch;
     double roll;
-    Position() {}
+    Position()
+        : x(0), y(0), z(0), heading(0), pitch(0), roll(0) {}
     Position(double x, double y, double z, double heading, double pitch, double roll)
         : x(x), y(y), z(z), heading(heading), pitch(pitch), roll(roll) {}
 };
@@ -55,13 +58,43 @@ public:
 
 private:
     Ui::MainWindow *ui;
+    /**
+     * @brief 根据配置文件打开相关文件
+     */
     void openFile();
+
+    /**
+     * @brief 导出标注的栅格地图
+     */
     void exportFile();
+
+    /**
+     * @brief 只导出栅格地图背景
+     */
     void exportBackground();
+
+    /**
+     * @brief 导入相关文件
+     *
+     * 需要对应的文件在openFile中已经被正确打开
+     */
     void loadFile();
+
+    /**
+     * @brief 扫描输入文件，把必要的信息存储在内存中
+     */
     void scan();
+
+    /**
+     * @brief 设置需要可视化的时间范围
+     */
     void setTime();
+
+    /**
+     * @brief 执行可视化
+     */
     void execute();
+
     cv::Mat img;
     cv::Mat imgBackground;
     cv::Mat originMap;
@@ -80,7 +113,6 @@ private:
     void setGridMaskF_gt(cv::Mat mat, int m, int n, int value);
     QVector<QPoint> calculateLine(QPoint p1, QPoint p2);
     QVector<QPoint> calculateInner(QVector<QPoint> polygon);
-    void updateImage();
     QSettings *setting;
 
     CoordinateConvertion coord;
@@ -106,6 +138,9 @@ private:
     QVector<int> imageFrameList;
     VeloCalib innerCalib;
     QString calibFilename;
+
+    void updateImage();
+
     void drawCalibVelodyneOnImage(QVector<cv::Point3d> laser, QVector<cv::Scalar> color, cv::Mat& image);
 
     void showSplitCloud();
@@ -114,8 +149,6 @@ protected:
     void mouseMoveEvent(QMouseEvent *event);
     void keyPressEvent(QKeyEvent *event);
 
-    QVector<cv::Point3d> pointsGlobal;
-    QVector<cv::Scalar> colorsGlobal;
 };
 
 #endif // MAINWINDOW_H

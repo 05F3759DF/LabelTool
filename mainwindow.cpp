@@ -7,16 +7,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     coord.SetCoordinateParameters(CoordinateConvertion::_BEIJINGLOCAL);
 
-    X::Matrix rot, rotInv;
-    X::createRotMatrix_XYZ(rot, 0, 0, M_PI / 6);
-    X::createRotMatrix_ZYX(rotInv, 0, 0, -M_PI / 6);
-
-    X::Point3d p(1, 0, 0);
-    X::rotatePoint3d(p, rot);
-    qDebug() << p.x << p.y << p.z;
-    X::rotatePoint3d(p, rotInv);
-    qDebug() << p.x << p.y << p.z;
-
     connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::openFile);
     connect(ui->actionExport, &QAction::triggered, this, &MainWindow::exportFile);
     connect(ui->actionExport_Background, &QAction::triggered, this, &MainWindow::exportBackground);
@@ -175,6 +165,12 @@ void MainWindow::loadFile() {
 }
 
 void MainWindow::scan() {
+    gpsTimeList.clear();
+    posList.clear();
+    veloPosList.clear();
+    veloTimeList.clear();
+    cameraTimeList.clear();
+    imageFrameList.clear();
     char data[2048];
     int sec, usec, caplen, len;
     int timestamp, nsv1, nsv2;
@@ -200,8 +196,6 @@ void MainWindow::scan() {
     fclose(fgps);
     qDebug() << "GPS is loaded";
     FILE *fvelodyne = fopen(velodyneFilename.toStdString().c_str(), "rb");
-    veloPosList.clear();
-    veloTimeList.clear();
     fseeko64(fvelodyne, 0, SEEK_END);
     int64 total = ftello64(fvelodyne);
     //    fread(data, 1, 24, fvelodyne);
@@ -288,9 +282,8 @@ void MainWindow::execute() {
     int startIndex = ui->lineEdit_starttime->text().toInt();
     int endIndex = ui->lineEdit_endtime->text().toInt();
     qDebug() << "velotime" << veloTimeList[startIndex] << veloTimeList[endIndex];
+    qDebug() << "----------------------------------------";
 
-    pointsGlobal.clear();
-    colorsGlobal.clear();
     for (int index = startIndex; index <= endIndex; index++) {
         int veloTime = veloTimeList[index];
         int gpsIndexForVelo = std::lower_bound(gpsTimeList.begin(), gpsTimeList.end(), veloTime) - gpsTimeList.begin();
@@ -366,8 +359,7 @@ void MainWindow::execute() {
                 if (point.z > 0) {
                     continue;
                 }
-                pointsGlobal.append(cv::Point3d(point.x, point.y, point.z));
-                colorsGlobal.append(cv::Scalar(255, 0, 0));
+
                 int r = -point.y / VELOPIXELSIZE + VELOGRID;
                 int c = point.x / VELOPIXELSIZE + VELOGRID / 2;
                 setGridMaskF(veloMap, r, c, point.z);
@@ -583,7 +575,6 @@ void MainWindow::updateImage() {
     if (!camImg.empty()) {
         cam = camImg.clone();
         cam_raw = camImg.clone();
-        //        drawCalibVelodyneOnImage(pointsGlobal, colorsGlobal, cam);
         if (ui->checkBox_showLidar->isChecked()) {
             drawCalibVelodyneOnImage(points, colors, cam);
             drawCalibVelodyneOnImage(points_tag, colors_tag, cam);
@@ -678,9 +669,6 @@ void MainWindow::showSplitCloud() {
     int startIndex = ui->lineEdit_starttime->text().toInt();
     int endIndex = ui->lineEdit_endtime->text().toInt();
 
-    bool circleInit = true;
-    bool circleStart = true;
-    unsigned int startAngle;
     std::vector<std::vector<X::Point3d>> points;
     points.resize(32);
     for (int index = startIndex; index <= endIndex; index++) {
@@ -698,25 +686,7 @@ void MainWindow::showSplitCloud() {
             unsigned int blockID = (unsigned char)data[blockStart] + (unsigned char)data[blockStart + 1] * 0x100;
             int blockOffset = blockID == 0xEEFF ? 0 : 32;
             unsigned int rotationData = (unsigned char)data[blockStart + 2] + (unsigned char)data[blockStart + 3] * 0x100;
-//            qDebug() << "time" << veloTime << rotationData;
-            if (!circleInit && (rotationData - startAngle < 20 || rotationData - startAngle < -35980)) {
-                qDebug() << "new" << points[0].size();
-                if (points[0].size() > 800) {
-                    PointClassifier classifier;
-                    classifier.setPointCloud(points);
-                    circleStart = true;
-                    for (auto &s: points) {
-                        s.clear();
-                    }
-                    qDebug() << "------------------------------------------------";
-                }
-            }
-            circleStart = false;
-            if (circleInit) {
-                startAngle = rotationData;
-                circleInit = false;
-            }
-//            qDebug() << rotationData;
+
             double theta = rotationData / 18000.0 * M_PI;
             for (int j = 0; j < 32; j++) {
                 int index = j + blockOffset;
