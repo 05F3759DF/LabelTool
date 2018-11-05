@@ -5,30 +5,29 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow) {
     ui->setupUi(this);
+
+    // 设置 GPS 局部坐标系起点
     coord.SetCoordinateParameters(CoordinateConvertion::_BEIJINGLOCAL);
 
-    connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::openFile);
-    connect(ui->actionExport, &QAction::triggered, this, &MainWindow::exportFile);
-    connect(ui->actionExport_Background, &QAction::triggered, this, &MainWindow::exportBackground);
-    connect(ui->actionLoad, &QAction::triggered, this, &MainWindow::loadFile);
-    connect(ui->actionScan, &QAction::triggered, this, &MainWindow::scan);
-    connect(ui->pushButton_set, &QPushButton::clicked, this, &MainWindow::setTime);
-    connect(ui->pushButton_execute, &QPushButton::clicked, this, &MainWindow::execute);
-    connect(ui->pushButton_showSplitCloud, &QPushButton::clicked, this, &MainWindow::showSplitCloud);
-
+    // 初始化图像
     img.create(GRID / VELOPIXELSIZE + 1, GRID / VELOPIXELSIZE + 1, CV_8UC3);
     veloImg.create(GRID / VELOPIXELSIZE + 1, GRID / VELOPIXELSIZE + 1, CV_8UC3);
     originMap = cv::Mat(GRID, GRID, CV_8U);
     originMap.setTo(0);
     maskMap = cv::Mat(GRID, GRID, CV_8U);
     maskMap.setTo(0);
+    // 把显示 velodyne 点的图像所有点置为特殊值（-1000）
     veloMap = cv::Mat(VELOGRID, VELOGRID, CV_32F);
     for (int i = 0; i < veloMap.rows; i++) {
         for (int j = 0; j < veloMap.cols; j++) {
             veloMap.at<float>(i, j) = -1000;
         }
     }
+
+    // 开始时，数据未初始化
     initialized = false;
+
+    // 颜色表
     colorTable[1] = cv::Scalar(0, 0, 255, 255);
     colorTable[2] = cv::Scalar(102, 217, 255, 255);
     colorTable[3] = cv::Scalar(0, 255, 0, 255);
@@ -38,6 +37,7 @@ MainWindow::MainWindow(QWidget *parent) :
     colorTable[13] = cv::Scalar(255, 0, 255, 25);
     colorTable[14] = cv::Scalar(255, 0, 128, 25);
 
+    // 当前标注数据的类型
     currentType = 1;
     ui->radioButton_type1->setChecked(true);
     connect(ui->radioButton_blank, &QRadioButton::clicked, [ = ](bool checked) {
@@ -66,6 +66,7 @@ MainWindow::MainWindow(QWidget *parent) :
         }
     });
 
+    // 当前绘图的类型
     ui->radioButton_point->setChecked(true);
     graphType = "Point";
     connect(ui->radioButton_point, &QRadioButton::clicked, [ = ](bool checked) {
@@ -86,6 +87,29 @@ MainWindow::MainWindow(QWidget *parent) :
             pointStack.clear();
         }
     });
+
+    // 可视化点的形状
+    ui->radioButton_circle->setChecked(true);
+    pointType = "Circle";
+    connect(ui->radioButton_circle, &QRadioButton::clicked, [ = ](bool checked) {
+        if (checked) {
+            pointType = "Circle";
+        }
+    });
+    connect(ui->radioButton_square, &QRadioButton::clicked, [ = ](bool checked) {
+        if (checked) {
+            pointType = "Square";
+        }
+    });
+    connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::openFile);
+    connect(ui->actionExport, &QAction::triggered, this, &MainWindow::exportFile);
+    connect(ui->actionExport_Background, &QAction::triggered, this, &MainWindow::exportBackground);
+    connect(ui->actionLoad, &QAction::triggered, this, &MainWindow::loadFile);
+    connect(ui->actionScan, &QAction::triggered, this, &MainWindow::scan);
+    connect(ui->pushButton_set, &QPushButton::clicked, this, &MainWindow::setTime);
+    connect(ui->pushButton_execute, &QPushButton::clicked, this, &MainWindow::execute);
+
+    // 每 100 毫秒调用一次图像更新
     connect(&renderTimer, &QTimer::timeout, this, &MainWindow::updateImage);
     renderTimer.start(100);
 
@@ -99,11 +123,12 @@ MainWindow::~MainWindow() {
     delete ui;
 }
 
-void MainWindow::openFile() {
+bool MainWindow::openFile() {
     QString filename = QFileDialog::getOpenFileName(this, "Config", ".", "*.ini");
     if (filename.isEmpty()) {
-        return;
+        return false;
     }
+
     setting = new QSettings(filename, QSettings::IniFormat, this);
     velodyneFilename = setting->value("/Sensor/velodyne", "").toString();
     gpsFilename = setting->value("/Sensor/gps", "").toString();
@@ -111,13 +136,20 @@ void MainWindow::openFile() {
     calibFilename = setting->value("/Sensor/velocalib", "db32.xml").toString();
     ladybugFilename = setting->value("/Sensor/ladybug", "").toString();
     ladybugTimeFilename = setting->value("/Sensor/ladybugtime", "").toString();
-    qDebug() << velodyneFilename << gpsFilename << ladybugFilename << ladybugTimeFilename;
 
-    innerCalib.loadCalib(calibFilename.toStdString());
+    if (velodyneFilename.isEmpty() || gpsFilename.isEmpty() ||
+        ladybugFilename.isEmpty() || ladybugTimeFilename.isEmpty()) {
+        return false;
+    }
 
+    if (!innerCalib.loadCalib(calibFilename.toStdString())) {
+        return false;
+    }
+    return true;
 }
 
 void MainWindow::exportFile() {
+    // 导出被标注的点，CSV 格式，第一列为行，第二列为列，第三列为类型
     QString filename = ui->lineEdit_gpstime->text() + ".csv";
     QVector<QPair<QPoint, int>> pointList;
     for (int i = 0; i < originMap.rows; i++) {
@@ -133,6 +165,8 @@ void MainWindow::exportFile() {
         fprintf(f, "%d, %d, %d\n", p.first.x(), p.first.y(), p.second);
     }
     fclose(f);
+
+    // 导出被标注的激光图像
     QString imgName = ui->lineEdit_gpstime->text() + ".png";
     cv::imwrite(imgName.toStdString(), img);
     QString camName = ui->lineEdit_gpstime->text() + "_cam.png";
@@ -226,7 +260,7 @@ void MainWindow::scan() {
     FILE *fladybug = fopen(ladybugTimeFilename.toStdString().c_str(), "r");
     int frame = 0;
     while (!feof(fladybug)) {
-        fscanf(fladybug, "%d", &timestamp, data);
+        fscanf(fladybug, "%d", &timestamp);
         cameraTimeList.append(timestamp);
         imageFrameList.append(frame++);
     }
@@ -250,8 +284,8 @@ void MainWindow::setTime() {
         return;
     }
     auto index = pos - veloTimeList.begin();
-    //    auto startIndex = index - 4320;
-    //    auto endIndex = index + 34560;
+    // 向前数 180 个packet（大约0.1s），向后数 1800 个packet（大约1s）
+    // 作为默认可视化的范围
     auto startIndex = index - 180;
     auto endIndex = index + 1800;
 
@@ -312,14 +346,20 @@ void MainWindow::execute() {
                 int index = j + blockOffset;
                 int distanceData = (unsigned char)data[blockStart + 4 + j * 3] + (unsigned char)data[blockStart + 5 + j * 3] * 0x100;
                 int intensity = (unsigned char)data[blockStart + 6 + j * 3];
+
+                // 激光点无效
                 if (distanceData == 0) {
                     continue;
                 }
 
                 double distance = distanceData * innerCalib.unit + innerCalib.distCorrection[index];
+
+                // 太远的激光点不考虑
                 if (distance > 3000) {
                     continue;
                 }
+
+                // 计算激光点坐标
                 double cosVertAngle = cos(innerCalib.vertCorrection[index]);
                 double sinVertAngle = sin(innerCalib.vertCorrection[index]);
 
@@ -332,51 +372,46 @@ void MainWindow::execute() {
                 point.x = xyDistance * sinRotAngle * 0.01;
                 point.y = xyDistance * cosRotAngle * 0.01;
                 point.z = distance * sinVertAngle * 0.01; // to m
+
+                // 旋转到车体的坐标系方向上
                 rotate(point, M_PI_2, 0, 0);
+
+                // 只考虑车前方的激光点
                 if (point.y < 0) {
                     continue;
                 }
+
+                // 如果激光点在车身上，那么不考虑
                 if (point.y < 3 && point.y > -1.8 && abs(point.x) < 1.5) {
-//                    pointsGlobal.append(cv::Point3d(point.x, point.y, point.z));
-//                    colorsGlobal.append(cv::Scalar(0, 0, 255));
                     continue;
                 }
+
+                // 高于激光安装位置的点，不考虑
+                if (point.z > 0) {
+                    continue;
+                }
+
+                // 把激光点按照 GPS 坐标进行坐标变换
                 X::Point3d p(point.x, point.y, point.z);
                 X::rotatePoint3d(p, rot);
                 p.x = p.x + deltaX;
                 p.y = p.y + deltaY;
-                //                p.z = p.z + deltaZ;
+                p.z = p.z + deltaZ;
                 X::rotatePoint3d(p, rotInv);
                 point.x = p.x;
                 point.y = p.y;
                 point.z = p.z;
 
-                //                rotate(point, pointPos.heading);
-                //                point.x += deltaX;
-                //                point.y += deltaY;
-                //                point.z += deltaZ;
-                //                rotate(point, -currentPos.heading);
-                if (point.z > 0) {
-                    continue;
-                }
-
+                // 计算激光点在栅格地图上的行列
                 int r = -point.y / VELOPIXELSIZE + VELOGRID;
                 int c = point.x / VELOPIXELSIZE + VELOGRID / 2;
                 setGridMaskF(veloMap, r, c, point.z);
-
-                /// Draw traj
-                //                cv::Point3d p_point;
-                //                p_point.x = deltaX;
-                //                p_point.y = deltaY;
-                //                rotate(p_point, -currentPos.heading, 0, 0);
-                //                int p_r = -p_point.y * 10 + VELOGRID;
-                //                int p_c = p_point.x * 10 + VELOGRID / 2;
-                //                setGridMaskF(veloMap, p_r, p_c, 100);
             }
         }
     }
     fclose(fvelodyne);
 
+    // 查找和激光帧对应的图像用于可视化
     int cameraIndexForVelo = std::lower_bound(cameraTimeList.begin(), cameraTimeList.end(), time) - cameraTimeList.begin();
     if (cameraIndexForVelo == 0 || cameraIndexForVelo == cameraTimeList.size()) {
         return;
@@ -388,7 +423,7 @@ void MainWindow::execute() {
     }
 }
 
-void MainWindow::fillGrid(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color, bool withoutBorder) {
+void MainWindow::fillGrid(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color) {
     if (m < 0 || n < 0 || m >= mat.rows * pixelSize || n >= mat.cols * pixelSize) {
         return;
     }
@@ -396,7 +431,7 @@ void MainWindow::fillGrid(cv::Mat mat, int m, int n, double pixelSize, cv::Scala
                   cv::Point((n + 1) / pixelSize - 1, (m + 1) / pixelSize - 1), color, -1);
 }
 
-void MainWindow::fillCircle(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color, bool withoutBorder) {
+void MainWindow::fillCircle(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color) {
     if (m < 0 || n < 0 || m >= mat.rows * pixelSize || n >= mat.cols * pixelSize) {
         return;
     }
@@ -428,15 +463,6 @@ void MainWindow::setGridMaskF(cv::Mat mat, int m, int n, float value) {
         return;
     }
     mat.at<float>(m, n) = value;
-}
-
-void MainWindow::setGridMaskF_gt(cv::Mat mat, int m, int n, int value) {
-    if (m < 0 || n < 0 || m >= mat.rows || n >= mat.cols) {
-        return;
-    }
-    if (mat.at<float>(m, n) < value) {
-        mat.at<float>(m, n) = value;
-    }
 }
 
 QVector<QPoint> MainWindow::calculateLine(QPoint p1, QPoint p2) {
@@ -523,6 +549,8 @@ void MainWindow::updateImage() {
     img.setTo(255);
     QVector<cv::Point3d> points;
     QVector<cv::Scalar> colors;
+
+    // 可视化的最大最小范围
     double maxZ = ui->doubleSpinBox_max->text().toDouble();
     double minZ = ui->doubleSpinBox_min->text().toDouble();
     for (int i = 0; i < VELOGRID; i++) {
@@ -538,7 +566,7 @@ void MainWindow::updateImage() {
             int g = COLORMAP_G[level];
             points.append(cv::Point3d((j - veloMap.cols / 2) * VELOPIXELSIZE, (veloMap.rows - i) * VELOPIXELSIZE, veloMap.at<float>(i, j)));
             colors.append(cv::Scalar(b, g, r));
-            fillGrid(img, i, j, PIXELSIZE, cv::Scalar(255 - level, 255 - level, 255 - level, 0), false);
+            fillGrid(img, i, j, PIXELSIZE, cv::Scalar(255 - level, 255 - level, 255 - level, 0));
         }
     }
     imgBackground = img.clone();
@@ -550,7 +578,11 @@ void MainWindow::updateImage() {
             int tag = originMap.at<uchar>(i, j);
             if (tag) {
                 num += 1;
-                fillCircle(img, i, j, VELOPIXELSIZE, colorTable[tag]);
+                if (pointType == "Circle") {
+                    fillCircle(img, i, j, VELOPIXELSIZE, colorTable[tag]);
+                } else {
+                    fillGrid(img, i, j, VELOPIXELSIZE, colorTable[tag]);
+                }
                 for (int ti = 0; ti < RATIO; ti++) {
                     for (int tj = 0; tj < RATIO; tj++) {
                         points_tag.append(cv::Point3d((j * RATIO + tj - veloMap.cols / 2) * VELOPIXELSIZE, (veloMap.rows - i * RATIO - ti) * VELOPIXELSIZE,
@@ -559,8 +591,6 @@ void MainWindow::updateImage() {
 
                     }
                 }
-                //                points_tag.append(cv::Point3d((j - originMap.cols / 2) * PIXELSIZE, (originMap.rows - i + 0.5) * PIXELSIZE, veloMap.at<float>(i * RATIO, j * RATIO)));
-                //                colors_tag.append(colorTable[tag]);
             }
             int mask = maskMap.at<uchar>(i, j);
             if (mask) {
@@ -621,6 +651,7 @@ void MainWindow::drawCalibVelodyneOnImage(QVector<cv::Point3d> laser, QVector<cv
     X::Point3d velodyne_camera_shift;
     X::Matrix velodyne_camera_rot;
     double shv_x = 0, shv_y = 0, shv_z = 0.2;
+    // 和相机旋转的标定参数，可以在界面中微调
     double rot_x = 0, rot_y = 0, rot_z = ui->doubleSpinBox_rotz->text().toDouble();
     velodyne_camera_shift.x = shv_x;
     velodyne_camera_shift.y = shv_y;
@@ -633,10 +664,14 @@ void MainWindow::drawCalibVelodyneOnImage(QVector<cv::Point3d> laser, QVector<cv
 
     X::Point3d pL;
     for (int i = 0; i < laser.size(); i++) {
+
+        // 讲道理吧，后面 normalize 后这里的 scale 就没用了
+        // 但实际上运行会有影响，很奇怪
         double scale = ui->lineEdit_param->text().toDouble();
         pL.x = laser[i].x * scale;
         pL.y = laser[i].y * scale;
         pL.z = laser[i].z * scale;
+
         if (pL.z < -100) {
             pL.z = -2.12;
         }
@@ -660,64 +695,8 @@ void MainWindow::drawCalibVelodyneOnImage(QVector<cv::Point3d> laser, QVector<cv
     }
 }
 
-void MainWindow::showSplitCloud() {
-    int time = ui->lineEdit_gpstime->text().toInt();
-    int gpsIndex = std::lower_bound(gpsTimeList.begin(), gpsTimeList.end(), time) - gpsTimeList.begin();
-    auto currentPos = posList[gpsIndex];
-    FILE *fvelodyne = fopen(velodyneFilename.toStdString().c_str(), "rb");
-    char data[2048];
-    int startIndex = ui->lineEdit_starttime->text().toInt();
-    int endIndex = ui->lineEdit_endtime->text().toInt();
-
-    std::vector<std::vector<X::Point3d>> points;
-    points.resize(32);
-    for (int index = startIndex; index <= endIndex; index++) {
-        int veloTime = veloTimeList[index];
-        int gpsIndexForVelo = std::lower_bound(gpsTimeList.begin(), gpsTimeList.end(), veloTime) - gpsTimeList.begin();
-        if (gpsIndexForVelo == 0 || gpsIndexForVelo == gpsTimeList.size()) {
-            continue;
-        }
-
-        fseeko64(fvelodyne, veloPosList[index] + 42, SEEK_SET);
-        fread(data, 1, 1200, fvelodyne);
-
-        for (int i = 0; i < 12; i++) {
-            int blockStart = i * 100;
-            unsigned int blockID = (unsigned char)data[blockStart] + (unsigned char)data[blockStart + 1] * 0x100;
-            int blockOffset = blockID == 0xEEFF ? 0 : 32;
-            unsigned int rotationData = (unsigned char)data[blockStart + 2] + (unsigned char)data[blockStart + 3] * 0x100;
-
-            double theta = rotationData / 18000.0 * M_PI;
-            for (int j = 0; j < 32; j++) {
-                int index = j + blockOffset;
-                int distanceData = (unsigned char)data[blockStart + 4 + j * 3] + (unsigned char)data[blockStart + 5 + j * 3] * 0x100;
-                int intensity = (unsigned char)data[blockStart + 6 + j * 3];
-
-                double distance = distanceData * innerCalib.unit + innerCalib.distCorrection[index];
-
-                double cosVertAngle = cos(innerCalib.vertCorrection[index]);
-                double sinVertAngle = sin(innerCalib.vertCorrection[index]);
-
-                double cosRotAngle = cos(theta);
-                double sinRotAngle = sin(theta);
-
-                double xyDistance = distance * cosVertAngle;
-
-                X::Point3d point;
-                point.x = xyDistance * sinRotAngle * 0.01;
-                point.y = xyDistance * cosRotAngle * 0.01;
-                point.z = distance * sinVertAngle * 0.01; // to m
-                point.i = intensity;
-                rotate(point, M_PI_2, 0, 0);
-                point.z -= 2.12;
-                points[31 - innerCalib.idx[j]].push_back(point);
-            }
-        }
-    }
-
-}
-
 void MainWindow::mousePressEvent(QMouseEvent *event) {
+    // 当鼠标右键和 Ctrl 键按下时，清除当前格子的属性
     if (event->button() == Qt::RightButton && QApplication::keyboardModifiers() == Qt::ControlModifier) {
         auto point = ui->labelMapImage->mapFrom(this, event->pos());
         if (point.x() < 0 || point.y() < 0 || point.x() > GRID * PIXELSIZE || point.y() > GRID * PIXELSIZE) {
@@ -803,6 +782,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
+    // 鼠标移动的过程中，对图像进行着色
     if (graphType == "Point") {
         auto point = ui->labelMapImage->mapFrom(this, event->pos());
         int margin_left = ui->labelMapImage->width() <= img.rows ? 0 : (ui->labelMapImage->width() - img.rows) / 2;
@@ -873,6 +853,7 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event) {
+    // 按下 Esc 键的时候，清除绘制了一般的标注区域
     if (event->key() == Qt::Key_Escape) {
         pointStack.clear();
     }

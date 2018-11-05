@@ -68,13 +68,6 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="pushButton_showSplitCloud">
-          <property name="text">
-           <string>ShowSplitCloud</string>
-          </property>
-         </widget>
-        </item>
-        <item>
          <widget class="QCheckBox" name="checkBox_showLidar">
           <property name="text">
            <string>showLidar</string>
@@ -123,6 +116,13 @@
           </property>
           <property name="value">
            <double>3.455000000000000</double>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_4">
+          <property name="text">
+           <string>Scale</string>
           </property>
          </widget>
         </item>
@@ -215,6 +215,9 @@
            <property name="text">
             <string>Point</string>
            </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item>
@@ -231,6 +234,32 @@
            </property>
           </widget>
          </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="groupBox_2">
+        <property name="title">
+         <string>Point Type</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_5">
+         <item>
+          <widget class="QRadioButton" name="radioButton_circle">
+           <property name="text">
+            <string>Circle</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="radioButton_square">
+           <property name="text">
+            <string>Square</string>
+           </property>
+          </widget>
+         </item>
          <item>
           <spacer name="verticalSpacer">
            <property name="orientation">
@@ -239,7 +268,7 @@
            <property name="sizeHint" stdset="0">
             <size>
              <width>20</width>
-             <height>34</height>
+             <height>40</height>
             </size>
            </property>
           </spacer>

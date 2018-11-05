@@ -61,7 +61,7 @@ private:
     /**
      * @brief 根据配置文件打开相关文件
      */
-    void openFile();
+    bool openFile();
 
     /**
      * @brief 导出标注的栅格地图
@@ -104,13 +104,12 @@ private:
     cv::Mat veloMap;
     cv::Mat camImg, cam, cam_raw;
 
-    bool initialized;
+    bool initialized; /** 数据是否初始化 */
 
-    void fillGrid(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color = cv::Scalar(0, 0, 0), bool withoutBorder = true);
-    void fillCircle(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color = cv::Scalar(0, 0, 0), bool withoutBorder = true);
+    void fillGrid(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color = cv::Scalar(0, 0, 0));
+    void fillCircle(cv::Mat mat, int m, int n, double pixelSize, cv::Scalar color = cv::Scalar(0, 0, 0));
     void setGridMask(cv::Mat mat, int m, int n, int value);
     void setGridMaskF(cv::Mat mat, int m, int n, float value);
-    void setGridMaskF_gt(cv::Mat mat, int m, int n, int value);
     QVector<QPoint> calculateLine(QPoint p1, QPoint p2);
     QVector<QPoint> calculateInner(QVector<QPoint> polygon);
     QSettings *setting;
@@ -122,6 +121,7 @@ private:
     int currentType;
     QString graphType;
     QVector<QPoint> pointStack;
+    QString pointType;
 
     int startTime, endTime;
     QString velodyneFilename, gpsFilename, imuFilename;
@@ -139,11 +139,19 @@ private:
     VeloCalib innerCalib;
     QString calibFilename;
 
+    /**
+     * @brief 更新所有需要可视化的图像
+     */
     void updateImage();
 
+    /**
+     * @brief 把标注的激光点绘制到图像上
+     * @param laser 激光点序列
+     * @param color 和激光点序列对应的颜色序列
+     * @param image 被绘制的图像
+     */
     void drawCalibVelodyneOnImage(QVector<cv::Point3d> laser, QVector<cv::Scalar> color, cv::Mat& image);
 
-    void showSplitCloud();
 protected:
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
