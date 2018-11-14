@@ -14,6 +14,7 @@
 #include <QMap>
 #include <QTimer>
 #include <QDebug>
+#include <QRadioButton>
 
 #include <opencv2/opencv.hpp>
 
@@ -72,6 +73,11 @@ private:
      * @brief 只导出栅格地图背景
      */
     void exportBackground();
+
+    /**
+     * @brief exportLabelMap
+     */
+    void exportLabelMap();
 
     /**
      * @brief 导入相关文件
@@ -138,6 +144,8 @@ private:
     QVector<int> imageFrameList;
     VeloCalib innerCalib;
     QString calibFilename;
+
+    QMap<int, QString> labelGroup;
 
     /**
      * @brief 更新所有需要可视化的图像

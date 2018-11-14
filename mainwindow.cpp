@@ -32,10 +32,11 @@ MainWindow::MainWindow(QWidget *parent) :
     colorTable[2] = cv::Scalar(102, 217, 255, 255);
     colorTable[3] = cv::Scalar(0, 255, 0, 255);
     colorTable[4] = cv::Scalar(255, 0, 0, 255);
-    colorTable[11] = cv::Scalar(255, 255, 0, 25);
-    colorTable[12] = cv::Scalar(0, 0, 255, 25);
-    colorTable[13] = cv::Scalar(255, 0, 255, 25);
-    colorTable[14] = cv::Scalar(255, 0, 128, 25);
+
+    colorTable[101] = cv::Scalar(255, 255, 0, 25);
+    colorTable[102] = cv::Scalar(0, 0, 255, 25);
+    colorTable[103] = cv::Scalar(255, 0, 255, 25);
+    colorTable[104] = cv::Scalar(255, 0, 128, 25);
 
     // 当前标注数据的类型
     currentType = 1;
@@ -63,6 +64,12 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->radioButton_type4, &QRadioButton::clicked, [ = ](bool checked) {
         if (checked) {
             currentType = 4;
+        }
+    });
+    connect(ui->radioButton_other, &QRadioButton::clicked, [ = ](bool checked) {
+        if (checked) {
+            int currentOtherIndex = ui->comboBox->currentIndex();
+            currentType = currentOtherIndex + 5;
         }
     });
 
@@ -104,6 +111,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::openFile);
     connect(ui->actionExport, &QAction::triggered, this, &MainWindow::exportFile);
     connect(ui->actionExport_Background, &QAction::triggered, this, &MainWindow::exportBackground);
+    connect(ui->actionExport_LabelMap, &QAction::triggered, this, &MainWindow::exportLabelMap);
     connect(ui->actionLoad, &QAction::triggered, this, &MainWindow::loadFile);
     connect(ui->actionScan, &QAction::triggered, this, &MainWindow::scan);
     connect(ui->pushButton_set, &QPushButton::clicked, this, &MainWindow::setTime);
@@ -137,7 +145,7 @@ bool MainWindow::openFile() {
     ladybugFilename = setting->value("/Sensor/ladybug", "").toString();
     ladybugTimeFilename = setting->value("/Sensor/ladybugtime", "").toString();
 
-    if (velodyneFilename.isEmpty() || gpsFilename.isEmpty() ||
+    if (velodyneFilename.isEmpty() || gpsFilename.isEmpty() || imuFilename.isEmpty() ||
         ladybugFilename.isEmpty() || ladybugTimeFilename.isEmpty()) {
         return false;
     }
@@ -145,6 +153,39 @@ bool MainWindow::openFile() {
     if (!innerCalib.loadCalib(calibFilename.toStdString())) {
         return false;
     }
+
+    ui->comboBox->clear();
+    labelGroup.clear();
+
+    labelGroup[0] = "Unknown";
+    labelGroup[1] = "Convex";
+    labelGroup[2] = "Concave";
+    labelGroup[3] = "Free";
+    labelGroup[4] = "Water";
+    setting->beginGroup("/Label");
+    auto keys = setting->childKeys();
+    for (auto k: keys) {
+        if (k.startsWith("label_")) {
+            int index = k.mid(6).toInt();
+            if (index < 5) {
+                continue;
+            }
+            QString label = setting->value(k).toString();
+            labelGroup[index] = label;
+            ui->comboBox->addItem(label);
+            QString color = "color_" + QString::number(index);
+            if (keys.indexOf(color) != -1) {
+                QStringList colorValue = setting->value(keys[keys.indexOf(color)]).toStringList();
+                colorTable[index] = cv::Scalar(colorValue[2].toInt(), colorValue[1].toInt(), colorValue[0].toInt(), 255);
+            }
+        }
+    }
+    setting->endGroup();
+    connect(ui->comboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), [ = ]() {
+        if (ui->radioButton_other->isChecked()) {
+            currentType = ui->comboBox->currentIndex() + 5;
+        }
+    });
     return true;
 }
 
@@ -183,6 +224,18 @@ void MainWindow::exportBackground() {
     QMessageBox::information(this, "Info", QString("Background has been saved to %1.").arg(imgBackgroundName));
 }
 
+void MainWindow::exportLabelMap() {
+    QString labelMapName = "label_map.csv";
+    FILE *f = fopen(labelMapName.toStdString().c_str(), "w");
+    fprintf(f, "label, value\n");
+    for (auto p: labelGroup.keys()) {
+        fprintf(f, "%s, %d\n", labelGroup[p].toStdString().c_str(), p);
+    }
+    fclose(f);
+
+    QMessageBox::information(this, "Info", QString("Label map has been saved to %1.").arg(labelMapName));
+}
+
 void MainWindow::loadFile() {
     QString filename = QFileDialog::getOpenFileName(this, "Label", ".", "*.csv");
     if (filename.isEmpty()) {
@@ -208,14 +261,14 @@ void MainWindow::scan() {
     char data[2048];
     int sec, usec, caplen, len;
     int timestamp, nsv1, nsv2;
-    double lon, lat, alt, yaw, pitch, roll;
+    double lon, lat, alt, yaw, pitch, roll, tmp;
     FILE *fgps = fopen(gpsFilename.toStdString().c_str(), "r");
     FILE *fimu = fopen(imuFilename.toStdString().c_str(), "r");
     fscanf(fgps, "%[^\n]", data);
     fscanf(fimu, "%[^\n]", data);
     while (!feof(fgps)) {
         fscanf(fgps, "%d, %lf, %lf, %lf, %d, %d", &timestamp, &lat, &lon, &alt, &nsv1, &nsv2);
-        fscanf(fimu, "%d, %lf, %lf, %lf", &timestamp, &yaw, &pitch, &roll);
+        fscanf(fimu, "%d, %lf, %lf, %lf, %lf, %lf, %lf", &timestamp, &yaw, &pitch, &roll, &tmp, &tmp, &tmp);
         yaw = yaw / 180.0 * M_PI;
         pitch = pitch / 180.0 * M_PI;
         roll = roll / 180.0 * M_PI;
@@ -396,7 +449,7 @@ void MainWindow::execute() {
                 X::rotatePoint3d(p, rot);
                 p.x = p.x + deltaX;
                 p.y = p.y + deltaY;
-                p.z = p.z + deltaZ;
+//                p.z = p.z + deltaZ;
                 X::rotatePoint3d(p, rotInv);
                 point.x = p.x;
                 point.y = p.y;
@@ -588,7 +641,6 @@ void MainWindow::updateImage() {
                         points_tag.append(cv::Point3d((j * RATIO + tj - veloMap.cols / 2) * VELOPIXELSIZE, (veloMap.rows - i * RATIO - ti) * VELOPIXELSIZE,
                                                       veloMap.at<float>(i * RATIO + ti, j * RATIO + tj)));
                         colors_tag.append(colorTable[tag]);
-
                     }
                 }
             }
@@ -699,11 +751,11 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
     // 当鼠标右键和 Ctrl 键按下时，清除当前格子的属性
     if (event->button() == Qt::RightButton && QApplication::keyboardModifiers() == Qt::ControlModifier) {
         auto point = ui->labelMapImage->mapFrom(this, event->pos());
-        if (point.x() < 0 || point.y() < 0 || point.x() > GRID * PIXELSIZE || point.y() > GRID * PIXELSIZE) {
+        if (point.x() < 0 || point.y() < 0 || point.x() > GRID / VELOPIXELSIZE || point.y() > GRID / VELOPIXELSIZE) {
             return;
         }
-        int m = point.x() / PIXELSIZE;
-        int n = point.y() / PIXELSIZE;
+        int m = point.y() * VELOPIXELSIZE;
+        int n = point.x() * VELOPIXELSIZE;
         setGridMask(originMap, m, n, 0);
     }
     if (graphType == "Point") {
@@ -795,7 +847,7 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
         int m = point.y() * VELOPIXELSIZE;
         int n = point.x() * VELOPIXELSIZE;
         maskMap.setTo(0);
-        setGridMask(maskMap, m, n, 12);
+//        setGridMask(maskMap, m, n, 102);
     }
     if (graphType == "Line") {
         auto point = ui->labelMapImage->mapFrom(this, event->pos());
@@ -812,11 +864,11 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
         if (pointStack.size() == 1) {
             QVector<QPoint> points = calculateLine(pointStack[0], QPoint(m, n));
             for (auto p: points) {
-                setGridMask(maskMap, p.x(), p.y(), 11);
+                setGridMask(maskMap, p.x(), p.y(), 101);
             }
-            setGridMask(maskMap, pointStack[0].x(), pointStack[0].y(), 12);
+            setGridMask(maskMap, pointStack[0].x(), pointStack[0].y(), 102);
         }
-        setGridMask(maskMap, m, n, 12);
+//        setGridMask(maskMap, m, n, 102);
     }
     if (graphType == "Polygon") {
         auto point = ui->labelMapImage->mapFrom(this, event->pos());
@@ -838,16 +890,16 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
             points.append(calculateLine(pointStack[0], QPoint(m, n)));
             points.append(calculateLine(pointStack[pointStack.size() - 1], QPoint(m, n)));
             for (auto p: points) {
-                setGridMask(maskMap, p.x(), p.y(), 11);
+                setGridMask(maskMap, p.x(), p.y(), 101);
             }
-            setGridMask(maskMap, pointStack[0].x(), pointStack[0].y(), 13);
+            setGridMask(maskMap, pointStack[0].x(), pointStack[0].y(), 103);
             for (int i = 1; i < pointStack.size(); i++) {
-                setGridMask(maskMap, pointStack[i].x(), pointStack[i].y(), 12);
+                setGridMask(maskMap, pointStack[i].x(), pointStack[i].y(), 102);
             }
         }
-        setGridMask(maskMap, m, n, 12);
+//        setGridMask(maskMap, m, n, 102);
         if (pointStack.size() > 0 && pointStack[0] == QPoint(m, n)) {
-            setGridMask(maskMap, m, n, 13);
+            setGridMask(maskMap, m, n, 103);
         }
     }
 }
